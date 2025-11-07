@@ -1,6 +1,6 @@
 # PRAXIA · Clínica de Citas Médicas
 
-Autor: Equipo PRAXIA (UNI)
+Autor: Henry Javier Medina Malpartida
 Carrera: Ingeniería de Software – Universidad Nacional de Ingeniería (UNI)
 Curso: Construcción de Software
 
@@ -20,9 +20,7 @@ El objetivo es digitalizar el flujo de atención, desde la reserva hasta la cons
 
 ### Frontend
 - React + Vite (TS) para una UI moderna y rápida.
-- TypeScript para mayor mantenibilidad y DX.
-- Tailwind CSS + shadcn/ui + Radix + lucide-react.
-- Estado ligero en cliente y consumo de API REST vía `fetch`.
+- TypeScript para mayor mantenibilidad y DX..
 
 ### Backend
 - Java 17 + Spring Boot (REST).
@@ -34,7 +32,7 @@ El objetivo es digitalizar el flujo de atención, desde la reserva hasta la cons
 
 ---
 
-## Funcionalidades (versión actual)
+## Funcionalidades
 
 - Autenticación básica y carga de perfil (demo).
 - Portal Paciente
