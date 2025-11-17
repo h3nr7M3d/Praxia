@@ -3,6 +3,7 @@ package com.praxia.api.controller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -80,60 +81,14 @@ public class CitaCatalogController {
     @Deprecated
     @PostMapping("/reservar-legacy")
     public ResponseEntity<?> reservarLegacy(@RequestBody Map<String,Object> payload) {
-        try {
-            Integer pacienteId = (Integer) payload.getOrDefault("pacienteId", 0);
-            Integer medicoId = (Integer) payload.getOrDefault("medicoId", 0);
-            Integer centroId = (Integer) payload.getOrDefault("centroId", 0);
-            Integer especialidadId = (Integer) payload.getOrDefault("especialidadId", 0);
-            Integer idAgenda = (Integer) payload.getOrDefault("idAgenda", 0);
-            String slotInicio = String.valueOf(payload.get("slotInicio"));
-            String modalidad = String.valueOf(payload.getOrDefault("modalidad", "presencial"));
-            Integer creadoPor = (Integer) payload.getOrDefault("creadoPor", pacienteId);
-
-            if (pacienteId == null || pacienteId == 0 || medicoId == null || centroId == null || especialidadId == null || slotInicio == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Datos incompletos"));
-            }
-
-            // TTL de reserva (usar variable efectivamente final para la lambda)
-            Integer reservaMinDb = jdbcTemplate.queryForObject("SELECT valor_int FROM parametro_negocio WHERE cod_parametro='MINUTOS_MAX_RESERVA_SIN_PAGO'", Integer.class);
-            final int reservaMin = reservaMinDb != null ? reservaMinDb : 20;
-
-            // Insert de la cita con estado 'reservada'
-            String sql = "INSERT INTO cita (id_paciente,id_medico,id_medico_centro,id_agenda,id_especialidad,slot_inicio,slot_fin,estado_cita,expira_reserva,modalidad,requiere_copago,pago_estado,pago_monto,pago_moneda,creado_por,rol_creador,origen) " +
-                    "VALUES (?,?,?,?,?,?,TIMESTAMPADD(MINUTE, (SELECT intervalo_min FROM agenda_medico WHERE id_agenda=?), ?),'reservada',TIMESTAMPADD(MINUTE, ?, ?),0,'pendiente',0.00,'PEN',?,'paciente','web')";
-
-            // Resolver id_medico_centro desde medicoId+centroId si no vino
-            Integer idMC = jdbcTemplate.queryForObject("SELECT id_medico_centro FROM medico_centro WHERE id_medico=? AND id_centro_medico=? LIMIT 1", Integer.class, medicoId, centroId);
-            if (idMC == null) return ResponseEntity.status(409).body(Map.of("success", false, "message", "El médico no atiende en ese centro"));
-
-            int rows = jdbcTemplate.update(sql, ps -> {
-                ps.setInt(1, pacienteId);
-                ps.setInt(2, medicoId);
-                ps.setInt(3, idMC);
-                ps.setInt(4, idAgenda != null && idAgenda > 0 ? idAgenda : 0);
-                ps.setInt(5, especialidadId);
-                ps.setString(6, slotInicio);
-                ps.setString(7, slotInicio);
-                ps.setInt(8, idAgenda != null && idAgenda > 0 ? idAgenda : 0);
-                ps.setInt(9, reservaMin);
-                ps.setString(10, modalidad);
-                ps.setInt(11, creadoPor);
-            });
-
-            if (rows > 0) {
-                Long idCita = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-                return ResponseEntity.ok(Map.of("success", true, "id_cita", idCita, "reserva_minutos", reservaMin));
-            }
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "No se pudo crear la cita"));
-        } catch (org.springframework.dao.DuplicateKeyException ex) {
-            return ResponseEntity.status(409).body(Map.of("success", false, "message", "El horario ya fue tomado"));
-        } catch (Exception ex) {
-            logger.error("Error reservando cita", ex);
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error al reservar"));
-        }
+        logger.warn("Se intento usar /citas/reservar-legacy con payload {}", payload);
+        return ResponseEntity.status(HttpStatus.GONE)
+                .body(Map.of(
+                        "success", false,
+                        "message", "El flujo legacy ya no esta disponible. Usa /citas/slots/{slotId}/reservar."
+                ));
     }
 
-    
     @GetMapping("/especialidades/{id}/medicos/count")
     public ResponseEntity<?> contarMedicosPorEspecialidad(@PathVariable Integer id) {
         try {
@@ -402,3 +357,4 @@ public class CitaCatalogController {
         }
     }
 }
+

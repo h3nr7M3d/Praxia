@@ -1,4 +1,4 @@
-package com.praxia.api.controller;
+﻿package com.praxia.api.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,10 +65,10 @@ public class AuthController {
                 ));
             }
 
-            // Validación de contraseña (DEV):
-            // - Si la columna contraseña guarda texto plano tipo "hash$u25",
+            // Validaci??n de contrase??a (DEV):
+            // - Si la columna contrase??a guarda texto plano tipo "hash$u25",
             //   comparamos igualdad simple.
-            // - Si en el futuro migras a BCrypt ($2a/$2b/$2y) podemos añadir verificación específica.
+            // - Si en el futuro migras a BCrypt ($2a/$2b/$2y) podemos a??adir verificaci??n espec??fica.
             String provided = loginRequest.getPassword();
             String stored = user.getContrasenaHash();
             if (provided == null || stored == null) {
@@ -83,7 +84,7 @@ public class AuthController {
                 String plain = stored.substring(5);
                 matches = stored.equals(provided) || plain.equals(provided);
             } else if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
-                // Si más adelante agregas BCrypt, cámbialo por una verificación real
+                // Si m??s adelante agregas BCrypt, c??mbialo por una verificaci??n real
                 matches = false;
             } else {
                 matches = stored.equals(provided);
@@ -96,17 +97,80 @@ public class AuthController {
                 ));
             }
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("userId", user.getId());
-            response.put("message", "Autenticacion exitosa");
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(buildLoginPayload(user));
         } catch (Exception e) {
             logger.error("Error en login", e);
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Error interno en autenticacion"
             ));
+        }
+    }
+
+    private Map<String, Object> buildLoginPayload(Usuario user) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        long userId = user.getId() != null ? user.getId().longValue() : 0L;
+        response.put("success", true);
+        response.put("userId", userId);
+        response.put("nombre", user.getNombre());
+        response.put("apellido", user.getApellido());
+
+        List<String> roles = fetchRoles(userId);
+        response.put("roles", roles);
+
+        String portal = resolvePortal(roles);
+        response.put("defaultPortal", portal);
+        response.put("esPaciente", Boolean.TRUE.equals(isPaciente(userId)));
+        response.put("message", "Autenticacion exitosa");
+        return response;
+    }
+
+    private List<String> fetchRoles(Long userId) {
+        if (jdbcTemplate == null) {
+            return List.of();
+        }
+        try {
+            return jdbcTemplate.query(
+                    """
+                            SELECT r.nmb_rol
+                            FROM usuario_rol ur
+                            JOIN rol r ON r.id_rol = ur.id_rol
+                            WHERE ur.id_usuario = ?
+                            """,
+                    (rs, i) -> rs.getString("nmb_rol"),
+                    userId.longValue()
+            );
+        } catch (Exception e) {
+            logger.warn("No se pudieron cargar roles para usuario {}", userId, e);
+            return List.of();
+        }
+    }
+
+    private String resolvePortal(List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return "paciente";
+        }
+        if (roles.stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r))) {
+            return "admin";
+        }
+        if (roles.stream().anyMatch(r -> "MEDICO".equalsIgnoreCase(r))) {
+            return "medico";
+        }
+        return "paciente";
+    }
+
+    private Boolean isPaciente(Long userId) {
+        if (jdbcTemplate == null) return null;
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM paciente WHERE id_paciente = ?",
+                    Integer.class,
+                    userId
+            );
+            return count != null && count > 0;
+        } catch (Exception e) {
+            logger.debug("No se pudo verificar si el usuario {} es paciente", userId, e);
+            return null;
         }
     }
 
@@ -196,7 +260,7 @@ public class AuthController {
                     geoLoaded = true;
                 }
             } catch (Exception ex) {
-                logger.warn("No se pudieron obtener datos geográficos del paciente mediante JdbcTemplate", ex);
+                logger.warn("No se pudieron obtener datos geogr??ficos del paciente mediante JdbcTemplate", ex);
             }
         }
 
@@ -481,3 +545,4 @@ public class AuthController {
         public void setPassword(String password) { this.password = password; }
     }
 }
+

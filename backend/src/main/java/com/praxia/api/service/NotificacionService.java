@@ -20,54 +20,63 @@ public class NotificacionService {
     }
 
     public void enqueueReserva(long idCita) {
-        String sql = "INSERT IGNORE INTO notificacion\n" +
-                "(id_usuario, id_canal, id_plantilla, id_cita, id_agenda, correlacion, datos, programada_para)\n" +
-                "SELECT\n" +
-                "  c.creado_por,\n" +
-                "  1,\n" +
-                "  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod='CITA_RESERVADA'),\n" +
-                "  c.id_cita, c.id_agenda,\n" +
-                "  CONCAT('RESERVA_', c.id_cita),\n" +
-                "  JSON_OBJECT(\n" +
-                "    'nombre', CONCAT(u.nombre,' ',u.apellido),\n" +
-                "    'medico', CONCAT(um.nombre,' ',um.apellido),\n" +
-                "    'especialidad', e.nmb_especialidad,\n" +
-                "    'fecha_hora', DATE_FORMAT(c.slot_inicio,'%d/%m/%Y %H:%i'),\n" +
-                "    'centro', COALESCE(cm.nmb_centro_medico,'Centro Virtual'),\n" +
-                "    'modalidad', c.modalidad,\n" +
-                "    'id_cita', c.id_cita\n" +
-                "  ),\n" +
-                "  NOW()\n" +
-                "FROM cita c\n" +
-                "JOIN usuario u  ON u.id_usuario = c.creado_por\n" +
-                "JOIN usuario um ON um.id_usuario = c.id_medico\n" +
-                "LEFT JOIN especialidad e   ON e.id_especialidad = c.id_especialidad\n" +
-                "LEFT JOIN centro_medico cm ON cm.id_centro_medico = c.id_medico_centro\n" +
-                "LEFT JOIN notificacion n0  ON n0.id_cita=c.id_cita AND n0.correlacion=CONCAT('RESERVA_',c.id_cita)\n" +
-                "WHERE c.id_cita = ? AND n0.id_notif IS NULL";
+        String sql = """
+                INSERT IGNORE INTO notificacion
+                (id_usuario, id_canal, id_plantilla, id_cita, id_agenda, correlacion, datos, programada_para)
+                SELECT
+                  c.id_paciente,
+                  1,
+                  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod='CITA_RESERVADA'),
+                  c.id_cita, c.id_agenda,
+                  CONCAT('RESERVA_', c.id_cita),
+                  JSON_OBJECT(
+                    'nombre', CONCAT(up.nombre,' ',up.apellido),
+                    'medico', CONCAT(um.nombre,' ',um.apellido),
+                    'especialidad', e.nmb_especialidad,
+                    'fecha_hora', DATE_FORMAT(CONCAT(a.fch_agenda,' ',c.hora_inicio_cita),'%d/%m/%Y %H:%i'),
+                    'centro', COALESCE(cm.nmb_centro_medico,'Centro Medico'),
+                    'modalidad', COALESCE(a.nmb_tipo_agenda,'PRESENCIAL'),
+                    'id_cita', c.id_cita
+                  ),
+                  NOW()
+                FROM citas c
+                JOIN paciente p         ON p.id_paciente = c.id_paciente
+                JOIN usuario up         ON up.id_usuario = p.id_paciente
+                JOIN agenda a           ON a.id_agenda = c.id_agenda
+                JOIN medico_centro_especialidad mce ON mce.id_medico_centro_especialidad = a.id_medico_centro_especialidad
+                JOIN medico m           ON m.id_medico = mce.id_medico
+                JOIN usuario um         ON um.id_usuario = m.id_usuario
+                JOIN especialidad e     ON e.id_especialidad = mce.id_especialidad
+                JOIN centro_medico cm   ON cm.id_centro_medico = mce.id_centro_medico
+                LEFT JOIN notificacion n0 ON n0.id_cita=c.id_cita AND n0.correlacion=CONCAT('RESERVA_',c.id_cita)
+                WHERE c.id_cita = ? AND n0.id_notif IS NULL
+                """;
         jdbcTemplate.update(sql, idCita);
     }
 
     public void enqueueCambioEstado(long idCita) {
-        String sql = "INSERT IGNORE INTO notificacion\n" +
-                "(id_usuario,id_canal,id_plantilla,id_cita,id_agenda,correlacion,datos,programada_para)\n" +
-                "SELECT\n" +
-                "  c.creado_por, 1,\n" +
-                "  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod='CITA_ESTADO'),\n" +
-                "  c.id_cita, c.id_agenda,\n" +
-                "  CONCAT('ESTADO_',c.id_cita,'_',c.estado_cita),\n" +
-                "  JSON_OBJECT(\n" +
-                "    'nombre', CONCAT(u.nombre,' ',u.apellido),\n" +
-                "    'estado', c.estado_cita,\n" +
-                "    'id_cita', c.id_cita\n" +
-                "  ),\n" +
-                "  NOW()\n" +
-                "FROM cita c\n" +
-                "JOIN usuario u ON u.id_usuario = c.creado_por\n" +
-                "LEFT JOIN notificacion n0 \n" +
-                "  ON n0.id_cita=c.id_cita \n" +
-                " AND n0.correlacion=CONCAT('ESTADO_',c.id_cita,'_',c.estado_cita)\n" +
-                "WHERE c.id_cita=? AND n0.id_notif IS NULL";
+        String sql = """
+                INSERT IGNORE INTO notificacion
+                (id_usuario,id_canal,id_plantilla,id_cita,id_agenda,correlacion,datos,programada_para)
+                SELECT
+                  c.id_paciente, 1,
+                  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod='CITA_ESTADO'),
+                  c.id_cita, c.id_agenda,
+                  CONCAT('ESTADO_',c.id_cita,'_',c.nmb_std_cita),
+                  JSON_OBJECT(
+                    'nombre', CONCAT(up.nombre,' ',up.apellido),
+                    'estado', c.nmb_std_cita,
+                    'id_cita', c.id_cita
+                  ),
+                  NOW()
+                FROM citas c
+                JOIN paciente p   ON p.id_paciente = c.id_paciente
+                JOIN usuario up   ON up.id_usuario = p.id_paciente
+                LEFT JOIN notificacion n0
+                  ON n0.id_cita=c.id_cita
+                 AND n0.correlacion=CONCAT('ESTADO_',c.id_cita,'_',c.nmb_std_cita)
+                WHERE c.id_cita=? AND n0.id_notif IS NULL
+                """;
         jdbcTemplate.update(sql, idCita);
     }
 
@@ -98,29 +107,35 @@ public class NotificacionService {
     }
 
     void enqueueReminder(String plantillaCod, String prefix, String intervalExpr) {
-        String sql = "INSERT IGNORE INTO notificacion\n" +
-                "(id_usuario,id_canal,id_plantilla,id_cita,id_agenda,correlacion,datos,programada_para)\n" +
-                "SELECT\n" +
-                "  c.creado_por, 1,\n" +
-                "  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod=?),\n" +
-                "  c.id_cita, c.id_agenda,\n" +
-                "  CONCAT(?,c.id_cita),\n" +
-                "  JSON_OBJECT(\n" +
-                "    'nombre', CONCAT(u.nombre,' ',u.apellido),\n" +
-                "    'medico', CONCAT(um.nombre,' ',um.apellido),\n" +
-                "    'especialidad', e.nmb_especialidad,\n" +
-                "    'fecha_hora', DATE_FORMAT(c.slot_inicio,'%d/%m/%Y %H:%i'),\n" +
-                "    'id_cita', c.id_cita\n" +
-                "  ),\n" +
-                "  DATE_SUB(c.slot_inicio, INTERVAL " + intervalExpr + ")\n" +
-                "FROM cita c\n" +
-                "JOIN usuario u  ON u.id_usuario = c.creado_por\n" +
-                "JOIN usuario um ON um.id_usuario = c.id_medico\n" +
-                "LEFT JOIN especialidad e ON e.id_especialidad = c.id_especialidad\n" +
-                "LEFT JOIN notificacion n0 ON n0.id_cita=c.id_cita AND n0.correlacion=CONCAT(?,c.id_cita)\n" +
-                "WHERE c.estado_cita IN ('reservada','confirmada')\n" +
-                "  AND c.slot_inicio > NOW()\n" +
-                "  AND n0.id_notif IS NULL";
+        String sql = String.format("""
+                INSERT IGNORE INTO notificacion
+                (id_usuario,id_canal,id_plantilla,id_cita,id_agenda,correlacion,datos,programada_para)
+                SELECT
+                  c.id_paciente, 1,
+                  (SELECT id_plantilla FROM plantilla_notificacion WHERE cod=?),
+                  c.id_cita, c.id_agenda,
+                  CONCAT(?,c.id_cita),
+                  JSON_OBJECT(
+                    'nombre', CONCAT(up.nombre,' ',up.apellido),
+                    'medico', CONCAT(um.nombre,' ',um.apellido),
+                    'especialidad', e.nmb_especialidad,
+                    'fecha_hora', DATE_FORMAT(CONCAT(a.fch_agenda,' ',c.hora_inicio_cita),'%%d/%%m/%%Y %%H:%%i'),
+                    'id_cita', c.id_cita
+                  ),
+                  DATE_SUB(TIMESTAMP(a.fch_agenda, c.hora_inicio_cita), INTERVAL %s)
+                FROM citas c
+                JOIN paciente p         ON p.id_paciente = c.id_paciente
+                JOIN usuario up         ON up.id_usuario = p.id_paciente
+                JOIN agenda a           ON a.id_agenda = c.id_agenda
+                JOIN medico_centro_especialidad mce ON mce.id_medico_centro_especialidad = a.id_medico_centro_especialidad
+                JOIN medico m           ON m.id_medico = mce.id_medico
+                JOIN usuario um         ON um.id_usuario = m.id_usuario
+                JOIN especialidad e     ON e.id_especialidad = mce.id_especialidad
+                LEFT JOIN notificacion n0 ON n0.id_cita=c.id_cita AND n0.correlacion=CONCAT(?,c.id_cita)
+                WHERE c.nmb_std_cita IN ('RESERVADA','CONFIRMADA')
+                  AND TIMESTAMP(a.fch_agenda, c.hora_inicio_cita) > NOW()
+                  AND n0.id_notif IS NULL
+                """, intervalExpr);
         jdbcTemplate.update(sql, plantillaCod, prefix, prefix);
     }
 
