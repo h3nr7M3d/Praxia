@@ -1,0 +1,373 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+
+import tipoDocumentoOptions from '../shared/tipoDocumentoOptions'
+
+type LoginMode = 'documento' | 'correo'
+
+export default function Login() {
+  const [mode, setMode] = useState<LoginMode>('documento')
+  const [docType, setDocType] = useState('DNI')
+  const [docNumber, setDocNumber] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [ok, setOk] = useState<boolean | null>(null)
+  const [docFocused, setDocFocused] = useState(false)
+
+  const navigate = useNavigate()
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
+  const docOptions = useMemo(() => tipoDocumentoOptions, [])
+  const selectedDoc = useMemo(() => docOptions.find(opt => opt.codigo === docType), [docOptions, docType])
+
+  useEffect(() => {
+    const storedMode = localStorage.getItem('praxia.login.mode') as LoginMode | null
+    const storedDocType = localStorage.getItem('praxia.login.docType')
+    if (storedMode) setMode(storedMode)
+    if (storedDocType) setDocType(storedDocType)
+  }, [])
+
+  function validate() {
+    if (!password.trim()) return 'La contraseña es obligatoria'
+    if (mode === 'documento') {
+      if (!docNumber.trim()) return 'Ingresa tu número de documento'
+    } else {
+      if (!email.trim()) return 'Ingresa tu correo electrónico'
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email.trim())) return 'Formato de correo electrónico inválido'
+    }
+    return null
+  }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const validation = validate()
+    if (validation) { 
+      setMessage(validation); 
+      setOk(false); 
+      return 
+    }
+    
+    setLoading(true)
+    setMessage(null)
+    setOk(null)
+    
+    try {
+      // Preparar el payload según el modo de inicio de sesión
+      const payload = mode === 'documento'
+        ? { 
+            tipoDocumento: docType, 
+            numeroDocumento: docNumber.trim(), 
+            password: password
+          }
+        : { 
+            email: email.trim().toLowerCase(), // Asegurar que el correo esté en minúsculas
+            password: password
+          }
+      
+      console.log('Enviando solicitud de login:', { 
+        url: `${API_BASE}/auth/login`, 
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      
+      // 1. Realizar la petición de login
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      
+      // Manejar la respuesta del servidor
+      let data;
+      try {
+        data = await res.json()
+        console.log('Respuesta del servidor (login):', data)
+      } catch (error) {
+        console.error('Error al parsear la respuesta del servidor:', error)
+        throw new Error('Error en la respuesta del servidor')
+      }
+
+      // Actualizar el estado con la respuesta
+      const isSuccess = res.ok && data.success === true
+      setOk(isSuccess)
+      setMessage(data.message || (isSuccess ? 'Autenticación exitosa' : 'Error en la autenticación'))
+
+      if (isSuccess && data.userId) {
+        // Guardar información del usuario
+        localStorage.setItem('userId', String(data.userId))
+        if (mode === 'correo') {
+          localStorage.setItem('userEmail', email.trim())
+        }
+        
+        // Guardar preferencias de recordar usuario si es necesario
+        if (remember) {
+          localStorage.setItem('praxia.login.mode', mode)
+          localStorage.setItem('praxia.login.docType', docType)
+          if (mode === 'documento') {
+            localStorage.setItem('praxia.login.docNumber', docNumber.trim())
+          }
+        } else {
+          localStorage.removeItem('praxia.login.docNumber')
+        }
+
+        // 2. Obtener el perfil del usuario
+        try {
+          console.log('Obteniendo perfil para userId:', data.userId)
+          const profRes = await fetch(`${API_BASE}/auth/profile?userId=${data.userId}`, {
+            headers: {
+              'Accept': 'application/json'
+            }
+          })
+          
+          if (profRes.ok) {
+            const prof = await profRes.json()
+            console.log('Perfil obtenido:', prof)
+            // Persistir nombre e email para UI (iniciales en avatar/menú)
+            try {
+              const fullName = [prof?.nombres, prof?.apellidos].filter(Boolean).join(' ').trim()
+              if (fullName) localStorage.setItem('userName', fullName)
+              if (prof?.email) localStorage.setItem('userEmail', String(prof.email))
+            } catch {}
+            
+            // Determinar el rol del usuario
+            const rawRole = prof?.rol ?? prof?.tipo ?? prof?.rolNombre
+            const normalizedRole = typeof rawRole === 'string' ? rawRole.toLowerCase() : 'paciente'
+            localStorage.setItem('role', normalizedRole)
+            console.log('Rol detectado:', normalizedRole)
+            
+            // Redirigir según el rol
+            if (normalizedRole === 'admin' || normalizedRole === 'administrador') {
+              console.log('Redirigiendo a dashboard de administrador')
+              navigate('/dashboard/admin')
+            } else if (normalizedRole === 'medico' || normalizedRole === 'doctor') {
+              console.log('Redirigiendo a portal médico')
+              navigate('/medico')
+            } else {
+              console.log('Redirigiendo a home (usuario paciente)')
+              navigate('/home')
+            }
+          } else {
+            console.warn('No se pudo obtener el perfil, redirigiendo a home por defecto')
+            navigate('/home')
+          }
+        } catch (error) {
+          console.error('Error al obtener el perfil:', error)
+          // Si hay un error al obtener el perfil, redirigir a home por defecto
+          navigate('/home')
+        }
+      }
+    } catch {
+      setOk(false)
+      setMessage('No se pudo conectar con el servidor')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="font-display bg-gradient-to-br from-primary/10 via-primary/5 to-background-light dark:from-purple-900/40 dark:via-purple-900/30 dark:to-background-dark text-text-light dark:text-text-dark min-h-screen">
+      <div className="flex items-center justify-center min-h-screen p-3.5 sm:p-5 lg:p-5">
+        <div className="w-full max-w-4xl mx-auto bg-white/95 dark:bg-surface-dark/95 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr]">
+          <div className="hidden lg:flex relative min-h-[420px]">
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: "url(/assets/imagenes_fondo/doctor_cita_medica.png?v=1)",
+                backgroundSize: 'cover',
+                backgroundPosition: 'left center'
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/18 via-primary/9 to-transparent" />
+            <div className="relative flex-1 flex flex-col justify-between px-8 py-7 text-white">
+              <div className="space-y-3.5 max-w-sm">
+                <h1 className="text-[22px] font-semibold tracking-wide">Bienestar digital con calidez humana</h1>
+                <p className="text-white/95 text-sm leading-relaxed">
+                  Agenda, historial clínico y comunicación directa con tu equipo médico desde un solo lugar.
+                </p>
+              </div>
+              <div className="space-y-2 text-[11px] text-white/85">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">verified_user</span>
+                  <span>Infraestructura segura y cumplimiento Ley 29733.</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">ecg_heart</span>
+                  <span>Agenda integrada con tu equipo de salud.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 sm:p-7 lg:p-8 flex flex-col justify-center lg:border-l lg:border-white/10 dark:lg:border-white/20">
+            <div className="hidden lg:flex items-center justify-center mb-5">
+              <img src="/assets/logo/praxia_logo_sin_fondo_nombre.png" alt="Praxia" className="h-16 w-auto drop-shadow" />
+            </div>
+            <div className="lg:hidden flex flex-col items-center text-center mb-8">
+              <img src="/assets/logo/praxia_logo_sin_fondo_nombre.png" alt="Praxia" className="h-24 w-auto drop-shadow-lg" />
+              <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-3 max-w-xs">
+                Atención humana y tecnología para cuidar tu bienestar.
+              </p>
+            </div>
+
+            <h2 className="text-xl sm:text-[24px] font-bold text-text-light dark:text-text-dark mb-1">Bienvenido de vuelta</h2>
+            <p className="text-text-secondary-light dark:text-text-secondary-dark mb-4 text-sm">Ingresa tus credenciales para acceder a tu cuenta.</p>
+
+            <div className="flex gap-2.5 mb-4">
+              <button
+                type="button"
+                onClick={() => setMode('documento')}
+                className={`flex-1 rounded-full border transition font-semibold px-4 py-2 text-sm ${
+                  mode === 'documento'
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'border-border-soft text-text-secondary'
+                }`}
+              >
+                DNI / CE
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('correo')}
+                className={`flex-1 px-4 py-2 rounded-md border ${mode === 'correo' ? 'border-primary text-primary bg-primary/10' : 'border-border-soft text-text-secondary'}`}
+              >
+                Correo electrónico
+              </button>
+            </div>
+
+            <form className="space-y-3" onSubmit={onSubmit} noValidate>
+              {mode === 'documento' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-text-light dark:text-text-dark" htmlFor="docType">
+                      Tipo de documento
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="doc-type"
+                        name="doc-type"
+                        value={docType}
+                        onChange={(e) => setDocType(e.target.value)}
+                        onFocus={() => setDocFocused(true)}
+                        onBlur={() => setDocFocused(false)}
+                        className={`appearance-none w-full px-4 py-2.5 pr-10 bg-background-light dark:bg-surface-dark border border-border-soft dark:border-border-soft/60 rounded-md focus:ring-primary focus:border-primary transition duration-150 ease-in-out ${docFocused ? 'text-text-light dark:text-text-dark caret-current' : 'text-transparent caret-transparent'}`}
+                      >
+                        {docOptions.map(opt => (
+                          <option key={opt.codigo} value={opt.codigo}>{opt.nombre}</option>
+                        ))}
+                      </select>
+                      {!docFocused && (
+                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-text-light dark:text-text-dark">
+                          {selectedDoc?.codigo ?? docType}
+                        </span>
+                      )}
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary-light dark:text-text-secondary-dark material-symbols-outlined text-base">
+                        expand_more
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-text-light dark:text-text-dark" htmlFor="docNumber">
+                      Número de documento
+                    </label>
+                    <input
+                      id="docNumber"
+                      name="docNumber"
+                      type="text"
+                      value={docNumber}
+                      onChange={(e) => setDocNumber(e.target.value)}
+                      placeholder="Ingresa tu número"
+                      className="w-full px-4 py-2.5 bg-background-light dark:bg-surface-dark border border-border-soft dark:border-border-soft/60 rounded-md focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark mb-2">Correo electrónico</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="usuario@praxia.com"
+                    className="w-full px-4 py-2.5 bg-background-light dark:bg-surface-dark border border-border-soft dark:border-border-soft/60 rounded-md focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark mb-2">Contraseña</label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 pr-10 bg-background-light dark:bg-surface-dark border border-border-soft dark:border-border-soft/60 rounded-md focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute inset-y-0 right-0 px-3 flex items-center text-text-secondary-light dark:text-text-secondary-dark"
+                  >
+                    <span className="material-symbols-outlined text-xl">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between flex-wrap gap-3.5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  />
+                  Recuérdame
+                </label>
+                <Link className="text-sm font-medium text-primary hover:underline" to="/recuperar">¿Olvidaste tu contraseña?</Link>
+              </div>
+
+              {message && (
+                <div className={`text-sm ${ok ? 'text-green-600' : 'text-red-600'}`}>{message}</div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full mt-4 bg-primary hover:bg-primary/90 text-white py-2.5 rounded-full font-semibold transition shadow-md"
+                disabled={loading}
+              >
+                {loading ? 'Validando…' : 'Iniciar sesión'}
+              </button>
+
+              <p className="text-center text-sm text-text-secondary-light dark:text-text-secondary-dark mt-4">
+                ¿No tienes una cuenta?{' '}
+                <Link className="text-primary font-medium hover:underline" to="/register">
+                  Regístrate aquí
+                </Link>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

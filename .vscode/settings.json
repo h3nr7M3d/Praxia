@@ -1,0 +1,7 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "maven.terminal.useJavaHome": true,
+  "maven.executable.preferMavenWrapper": true,
+  "maven.view.showEffectivePom": false
+}
+

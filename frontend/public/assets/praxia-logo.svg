@@ -1,0 +1,20 @@
+<svg width="512" height="256" viewBox="0 0 512 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Praxia - identidad visual</title>
+  <desc id="desc">Símbolo alado con bastón médico y logotipo tipográfico Praxia.</desc>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#5B21B6" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="256" rx="24" fill="#F3E8FF" />
+  <g transform="translate(72 40)">
+    <g transform="scale(1.1)">
+      <path d="M64 28c0-14 11-26 26-26s26 12 26 26-11 26-26 26S64 42 64 28z" fill="url(#grad)" />
+      <path d="M90 60c14.6-0.2 30.4-6.3 44-18 4.4-3.7 10.9-3.5 15.1 0.4 1.9 1.8 3.1 4.2 3.4 6.8 0.3 2.6-0.5 5.2-2.1 7.3-13.1 17.7-34.9 27.5-60 27.5S43.6 73.5 30.5 56c-1.5-2.1-2.3-4.7-2-7.3 0.3-2.6 1.5-5 3.4-6.8 4.2-3.9 10.7-4.1 15.1-0.4 13.6 11.7 29.4 17.8 44 18z" fill="url(#grad)" />
+      <path d="M90 76c4.4 0 8 3.6 8 8v16l18-12c3.6-2.4 8.4-1.4 10.7 2.2 2.3 3.6 1.3 8.4-2.2 10.8l-26.5 17.6v16.2l18.3-10.7c3.7-2.2 8.5-1 10.6 2.7 2.2 3.7 1 8.5-2.7 10.6L99 152v20c0 4.4-3.6 8-8 8s-8-3.6-8-8v-20l-19.2 12c-3.7 2.3-8.5 1.2-10.9-2.5-2.4-3.7-1.3-8.6 2.4-11l27.7-17.3v-16.3l-19.8 12.8c-3.6 2.3-8.4 1.2-10.7-2.4-2.3-3.6-1.3-8.4 2.2-10.7L82 100V84c0-4.4 3.6-8 8-8z" fill="url(#grad)" />
+    </g>
+    <text x="170" y="128" font-family="'Montserrat', 'Segoe UI', sans-serif" font-size="96" font-weight="700" letter-spacing="16" fill="#5B21B6">PRAXIA</text>
+    <text x="174" y="156" font-family="'Montserrat', 'Segoe UI', sans-serif" font-size="18" letter-spacing="4" fill="#5B21B6">CUERPO Y ALMA</text>
+  </g>
+</svg>

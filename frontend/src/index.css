@@ -1,0 +1,73 @@
+:root {
+  color-scheme: light dark;
+  --bg-light: #f3e8ff;
+  --bg-secondary: #efe0ff;
+  --surface: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --primary: #7c3aed;
+  --accent: #6d28d9;
+  --border-soft: #d6bcfa;
+  --font-display: 'Montserrat', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+}
+
+html.dark {
+  --bg-light: #121212;
+  --bg-secondary: #1e1e1e;
+  --surface: #1e1e1e;
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --primary: #8b5cf6;
+  --accent: #a855f7;
+  --border-soft: #4c1d95;
+}
+
+.bg-background-light { background-color: var(--bg-light); }
+.bg-background-secondary { background-color: var(--bg-secondary); }
+.bg-surface-light { background-color: var(--surface); }
+.bg-surface-dark { background-color: var(--surface); }
+.text-text-primary { color: var(--text-primary); }
+.text-text-secondary { color: var(--text-secondary); }
+.text-text-light { color: var(--text-primary); }
+.text-text-dark { color: var(--text-dark); }
+.text-text-secondary-light { color: var(--text-secondary); }
+.text-text-secondary-dark { color: var(--text-secondary-dark); }
+.text-primary { color: var(--primary); }
+.text-accent { color: var(--accent); }
+.bg-primary { background-color: var(--primary); }
+.bg-accent { background-color: var(--accent); }
+.border-border-soft { border-color: var(--border-soft); }
+.bg-white { background-color: #ffffff; }
+html.dark .bg-white { background-color: #1e1e1e; }
+html.dark .bg-background-secondary { background-color: var(--bg-secondary); }
+html.dark .bg-surface-light { background-color: var(--surface); }
+.hover\:border-primary:hover { border-color: var(--primary); }
+.hover\:text-primary:hover { color: var(--primary); }
+.hover\:bg-accent:hover { background-color: var(--accent); }
+.hover\:bg-background-light:hover { background-color: var(--bg-light); }
+.animate-slideInRight { animation: slideinright 0.3s cubic-bezier(0.4,0,0.2,1) both; }
+@keyframes slideinright { from{transform:translateX(100%);} to{transform:translateX(0);} }
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { line-height: 1.5; }
+
+/* Utilidades de opacidad para fondos personalizados */
+.bg-white\/70 { background-color: rgba(255, 255, 255, 0.7); }
+html.dark .bg-white\/70 { background-color: rgba(15, 23, 42, 0.7); }
+
+.bg-background-secondary\/60 { background-color: rgba(238, 242, 247, 0.6); }
+html.dark .bg-background-secondary\/60 { background-color: rgba(15, 23, 42, 0.6); }
+
+/* Mejoras de contraste en controles */
+select, input[type="month"], input[type="number"], input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="tel"], input[type="search"] {
+  color: var(--text-primary);
+}
+html.dark select, html.dark input[type="month"], html.dark input[type="number"], html.dark input[type="text"], html.dark input[type="email"], html.dark input[type="password"], html.dark input[type="date"], html.dark input[type="tel"], html.dark input[type="search"] {
+  color: var(--text-primary);
+}
+
+/* Placeholders más legibles en tema claro */
+::placeholder { color: var(--text-secondary); opacity: 1; }
+html.dark ::placeholder { color: var(--text-secondary); opacity: 0.8; }
